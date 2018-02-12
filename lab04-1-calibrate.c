@@ -7,22 +7,25 @@
 int target = 0;
 
 float kf = 0; //feed foreward constant, basically unused
-float kp = 12; 
-float kd = -40;
+float kp = 12;
+float kd = 2;
+int damping = 10; // damping value assigned to variable in control()
 
 float velocity = 0; //global var for angular velocity
 float lastAngle = 0; //velocity is calculated by subtracting current angle and dividing by elapsed time
 int sampleTime = 25; //time elapsed before recalculating velocity
 int t = 0; //time elapsed since last calculation
+float multiplier = 1; //use to make left side tilt corrector more powerful
 
-float leftDown = 39; //value of left light sensor when it is low to the grown
-float leftMid = 43; //value of left light sensor while balanced in center
-float leftUp = 63; //value of left light sensor while at hightest position
+int robot_calibrated = 0; //assigns values/allows balancing task to run
+float leftDown = 0; //value of left light sensor when it is low to the grown
+float leftMid = 0; //value of left light sensor while balanced in center
+float leftUp = 0; //value of left light sensor while at hightest position
 float leftAngle = -15; //angle of the robot when it's leaning to the left
 float midAngle = 0; //angle of the robot while it's balanced
-float rightDown = 44; //same as above, but for right sensor
-float rightMid = 53;
-float rightUp = 72;
+float rightDown = 0; //same as above, but for right sensor
+float rightMid = 0;
+float rightUp = 0;
 float rightAngle = 15;
 
 float getAngle(){ //uses linear interpolation of data points (numbers above) to calculate angle
@@ -55,23 +58,66 @@ float getVelocity(int t, int sampleTime){ //every sampleTime miliseconds, it rec
 		return velocity;
 }
 
-
 int feedForeward(int input){ //feed foreward box in diagram. input is 0 so it doesn't do anything in this case
 	int output = input*kf;
 	return output;
 }
+
 int control(int input){ //control portion of diagram, formula we're using is kp*angle+kd*angularVelocity
 	
-	int output = (int)(kp*(float)input+kd*getVelocity(t,10));
+	if(leftMid - SensorValue[leftSensor] > 0) //robot tilted left  
+		damping = abs(leftMid - SensorValue[leftSensor]);
+	else  //robot tilted to right 
+		damping = abs(rightMid - SensorValue[rightSensor]);
+	int output = (int)(round((kp*(float)input+kd*damping)));
+	if(output < 0){ //weak side power compensator 
+		output = (int)(output*multiplier);
+	}	
 	nxtDisplayString(2,"%d",output);
-	nxtDisplayString(3,"%f",kp*(float)input+kd*getVelocity(t,10));
 	return output;
 }
 int plant(int input){ //plant section of diagram
+	nxtDisplayString(7,"%d",input);
 	motor[leftMotor] = input;
 	motor[rightMotor] = input;
 	return (int)getAngle();
 }
+
+task calibrate(){ 
+	while(!robot_calibrated){
+		//nxtDisplayString(0,"%s", "waiting to calibrate");
+		//collect leftDown and rightUp, tilt robot so top of nxt tilted down
+		if(nNxtButtonPressed == kLeftButton){ /
+			leftDown = SensorValue[leftSensor];
+			rightUp = SensorValue[rightSensor];
+			nxtDisplayString(0,"%s", "left done");
+			nxtDisplayString(1,"%d", leftDown);
+			nxtDisplayString(4,"%d", rightUp);
+		}	
+		//collect rightDown and LeftUp
+		if(nNxtButtonPressed == kRightButton){
+			rightDown = SensorValue[rightSensor];
+			leftUp = SensorValue[leftSensor];
+			nxtDisplayString(0,"%s", "right done");
+			nxtDisplayString(2,"%d", leftUp);
+			nxtDisplayString(3,"%d", rightDown);
+		} 
+		if(nNxtButtonPressed == kEnterButton){
+			leftMid = SensorValue[leftSensor];
+			rightMid = SensorValue[rightSensor];
+			nxtDisplayString(5,"%d", leftMid);
+			nxtDisplayString(6,"%d", rightMid);
+		}	
+		if((leftDown && leftUp && rightDown && rightUp && leftMid && rightMid)){
+			robot_calibrated = 1;
+			nxtDisplayString(0,"%s", "Calibrated!");
+			for(int i = 0; i <=6; i++){
+				nxtDisplayClearTextLine(i);
+			}	
+		}	
+	}
+	//success
+}	
 
 task balance(){
 	int output = 0;
@@ -95,6 +141,8 @@ task main()
 		int right0 = SensorValue[rightSensor];
 		nxtDisplayString(2,"%d",left0);
 		nxtDisplayString(3,"%d",right0);//end for testing purposes only
+		startTask(calibrate);
+		while(!robot_calibrated) {}
 		startTask(balance);
 		while(true){};
 	}	
