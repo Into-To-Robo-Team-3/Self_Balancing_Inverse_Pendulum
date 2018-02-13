@@ -7,9 +7,9 @@
 int target = 1;
 
 int kf = 0; //feed foreward constant, basically unused
-int kp = 3;
-int kd = 6;
-int ki = 25;
+float kp = 3.8;
+float kd = 5.5;
+int ki = 24;
 //int damping = 5; // damping value assigned to variable in control()
 
 //float multiplier = 1.1; //use to make left side tilt corrector more powerful
@@ -26,8 +26,8 @@ int feedForeward(int input){ //feed foreward box in diagram. input is 0 so it do
 	return output;
 }
 
-int control(int input, int damp, int integral){ //control portion of diagram, formula we're using is kp*angle+kd*angularVelocity
-	int output = (int)(kp*input-damp+integral);
+int control(int input, float damp, float integral){ //control portion of diagram, formula we're using is kp*angle+kd*angularVelocity
+	int output = (int)((int)(kp*(float)input-damp+integral));
 	nxtDisplayString(2,"%d",output);
 	return output;
 }
@@ -40,20 +40,20 @@ int plant(int input){ //plant section of diagram
 	return result;
 }
 
-task calibrate(){ 
+task calibrate(){
 	while(!robot_calibrated){
 		//collect leftDown and rightUp, tilt robot so top of nxt tilted down
-		if(nNxtButtonPressed == kLeftButton){ 
+		if(nNxtButtonPressed == kLeftButton){
 			target = SensorValue[rightSensor] - SensorValue[leftSensor];
 			nxtDisplayString(4,"left:%d",SensorValue[leftSensor]);
 			nxtDisplayString(5,"left:%d",SensorValue[rightSensor]);
 			robot_calibrated = 1;
 			nxtDisplayString(0,"%s", "Calibrated!");
 			nxtDisplayString(1,"%d", target);
-		}	
+		}
 	}
 	//success
-}	
+}
 
 task balance(){
 	int output = 0;
@@ -61,8 +61,8 @@ task balance(){
 	while(true){ //modeling the closed circuit pid (should be self explanitory, but just ask if you need)
 		//int c = control(target+output);
 		if(t==2){
-			pastError = currentError;	
-			currentError = SensorValue[rightSensor] - SensorValue[leftSensor] - target; 
+			pastError = currentError;
+			currentError = SensorValue[rightSensor] - SensorValue[leftSensor] - target;
 			totalError += currentError;
 		nxtDisplayClearTextLine(6);
 		nxtDisplayClearTextLine(7)
@@ -71,8 +71,8 @@ task balance(){
 		}
 		t++;
 		wait1Msec(1);
-		int damp = kd*(currentError - pastError);
-		int integral = totalError/ki;
+		float damp = kd*(float)(currentError - pastError);
+		float integral = (float)totalError/ki;
 		int c = control(output - target,damp,integral);
 		int f = feedForeward(target);
 		output = plant(f+c);
@@ -90,5 +90,5 @@ task main()
 		//while(!robot_calibrated) {}
 		startTask(balance);
 		while(true){};
-	}	
+	}
 }
