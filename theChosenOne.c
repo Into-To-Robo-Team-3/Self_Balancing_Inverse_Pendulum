@@ -8,7 +8,7 @@ int target = 1;
 
 int kf = 0; //feed foreward constant, basically unused
 int kp = 3;
-int kd = 5;
+int kd = 6;
 int ki = 25;
 //int damping = 5; // damping value assigned to variable in control()
 
